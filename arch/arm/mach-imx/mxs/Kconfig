@@ -49,6 +49,10 @@ config TARGET_MX28EVK
 config TARGET_XEA
 	bool "Support XEA"
 
+config TARGET_PWSH1
+	bool "Support PW-SH1"
+	select BOARD_EARLY_INIT_F
+
 endchoice
 
 config SYS_SOC
@@ -57,5 +61,6 @@ config SYS_SOC
 source "board/freescale/mx28evk/Kconfig"
 source "board/liebherr/xea/Kconfig"
 source "board/ppcag/bg0900/Kconfig"
+source "board/sharp/pwsh1/Kconfig"
 
 endif
