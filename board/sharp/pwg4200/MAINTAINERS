@@ -1,0 +1,6 @@
+PW-G4200 BOARD
+M:	Suguru Saito <sg.sgch07@gmail.com>
+S:	Maintained
+F:	board/sharp/pwg4200/
+F:	include/configs/pwg4200.h
+F:	configs/pwg4200_defconfig
