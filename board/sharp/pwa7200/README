@@ -1,0 +1,12 @@
+SHARP Brain PW-A7200
+====================
+
+Supported for PW-A7200.
+
+Files of the PW-A7200 port
+--------------------------
+
+arch/arm/cpu/arm926ejs/mxs/	- The CPU support code for the Freescale i.MX28
+arch/arm/include/asm/arch-mxs/	- Header files for the Freescale i.MX28
+board/sharp/pwa7200/	- PW-A7200 board specific files
+include/configs/pwa7200.h	- PW-A7200 configuration file

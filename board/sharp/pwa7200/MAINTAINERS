@@ -1,0 +1,6 @@
+PW-A7200 BOARD
+M:	Suguru Saito <sg.sgch07@gmail.com>
+S:	Maintained
+F:	board/sharp/pwa7200/
+F:	include/configs/pwa7200.h
+F:	configs/pwa7200_defconfig
