@@ -26,9 +26,14 @@ config TARGET_MX7ULP_EVK
 	select MX7ULP
 	select SYS_ARCH_TIMER
 
+config TARGET_PWH1
+        bool "Support PW-H1 board"
+	select SYS_ARCH_TIMER
+
 endchoice
 
 source "board/ea/mx7ulp_com/Kconfig"
 source "board/freescale/mx7ulp_evk/Kconfig"
+source "board/sharp/pwh1/Kconfig"
 
 endif
