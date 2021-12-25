@@ -86,7 +86,7 @@ static int brain_mmc_cd(int id)
 	return 1;
 }
 
-int board_mmc_init(bd_t *bis)
+int board_mmc_init(struct bd_info *bis)
 {
 	mxsmmc_initialize(bis, 0, brain_mmc_wp, brain_mmc_cd);
 	mxsmmc_initialize(bis, 1, brain_mmc_wp, brain_mmc_cd);
