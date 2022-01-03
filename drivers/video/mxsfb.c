@@ -32,7 +32,11 @@
 #define BITS_PP		18
 #define BYTES_PP	4
 
+#ifdef CONFIG_BRAIN_2G
+struct mxs_dma_desc desc[24];
+#else
 struct mxs_dma_desc desc;
+#endif
 
 /**
  * mxsfb_system_setup() - Fine-tune LCDIF configuration
@@ -206,6 +210,314 @@ static int mxs_probe_common(struct udevice *dev, struct display_timing *timings,
 	mxs_lcd_init(dev, fb, timings, bpp);
 
 #ifdef CONFIG_VIDEO_MXS_MODE_SYSTEM
+#ifdef CONFIG_BRAIN_2G
+	struct mxs_lcdif_regs *regs = (struct mxs_lcdif_regs *)MXS_LCDIF_BASE;
+
+	u32 ctrl, ctrl1, ctrl2, xfer_count, width, height;
+	ctrl = readl(&regs->hw_lcdif_ctrl);
+	ctrl1 = readl(&regs->hw_lcdif_ctrl1);
+	ctrl2 = readl(&regs->hw_lcdif_ctrl2);
+	xfer_count = readl(&regs->hw_lcdif_transfer_count);
+	width = ((xfer_count & LCDIF_TRANSFER_COUNT_H_COUNT_MASK) >>
+		LCDIF_TRANSFER_COUNT_H_COUNT_OFFSET);
+	height = ((xfer_count & LCDIF_TRANSFER_COUNT_V_COUNT_MASK) >>
+		LCDIF_TRANSFER_COUNT_V_COUNT_OFFSET);
+
+	__attribute__ ((aligned (ARCH_DMA_MINALIGN)))
+	static u8 lcd_data[ARCH_DMA_MINALIGN * 8];
+	lcd_data[ARCH_DMA_MINALIGN * 0] = 0x2a;
+	lcd_data[ARCH_DMA_MINALIGN * 1] = 0x2b;
+	lcd_data[ARCH_DMA_MINALIGN * 2] = 0x2c;
+	lcd_data[ARCH_DMA_MINALIGN * 3] = 0x00;
+	lcd_data[ARCH_DMA_MINALIGN * 4] = (height & 0xff00) >> 8;
+	lcd_data[ARCH_DMA_MINALIGN * 5] = (height & 0x00ff) - 1;
+	lcd_data[ARCH_DMA_MINALIGN * 6] = (width  & 0xff00) >> 8;
+	lcd_data[ARCH_DMA_MINALIGN * 7] = (width  & 0x00ff) - 1;
+
+	/* Create MXS DMA command descriptors for the DMA chain */
+	memset(desc, 0, sizeof(struct mxs_dma_desc) * 24);
+	/* Column Address Set (2a) */
+	desc[0].address = (dma_addr_t)&desc[0];
+	desc[0].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(6 << MXS_DMA_DESC_PIO_WORDS_OFFSET);
+	desc[0].cmd.pio_words[0] = LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_WORD_LENGTH_8BIT | LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT;
+	desc[0].cmd.pio_words[1] = (ctrl1 & (~LCDIF_CTRL1_BYTE_PACKING_FORMAT_MASK))
+		| (0x1 << LCDIF_CTRL1_BYTE_PACKING_FORMAT_OFFSET);
+	desc[0].cmd.pio_words[2] = ctrl2;
+	desc[0].cmd.pio_words[3] = (1 << LCDIF_TRANSFER_COUNT_V_COUNT_OFFSET) |
+		(1 << LCDIF_TRANSFER_COUNT_H_COUNT_OFFSET);
+	desc[0].cmd.pio_words[4] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 0);
+	desc[0].cmd.pio_words[5] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 0);
+	desc[0].cmd.next = (uint32_t)&desc[1].cmd;
+	/* RUN */
+	desc[1].address = (dma_addr_t)&desc[1];
+	desc[1].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(1 << MXS_DMA_DESC_PIO_WORDS_OFFSET) | MXS_DMA_DESC_WAIT4END;
+	desc[1].cmd.pio_words[0] = LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_WORD_LENGTH_8BIT | LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT |
+		LCDIF_CTRL_RUN;
+	desc[1].cmd.next = (uint32_t)&desc[2].cmd;
+
+	/* Column Address Set - Start Column (upper byte) */
+	desc[2].address = (dma_addr_t)&desc[2];
+	desc[2].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(6 << MXS_DMA_DESC_PIO_WORDS_OFFSET);
+	desc[2].cmd.pio_words[0] = LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_DATA_SELECT | LCDIF_CTRL_WORD_LENGTH_8BIT |
+		LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT;
+	desc[2].cmd.pio_words[1] = (ctrl1 & (~LCDIF_CTRL1_BYTE_PACKING_FORMAT_MASK))
+		| (0x1 << LCDIF_CTRL1_BYTE_PACKING_FORMAT_OFFSET);
+	desc[2].cmd.pio_words[2] = ctrl2;
+	desc[2].cmd.pio_words[3] = (1 << LCDIF_TRANSFER_COUNT_V_COUNT_OFFSET) |
+		(1 << LCDIF_TRANSFER_COUNT_H_COUNT_OFFSET);
+	desc[2].cmd.pio_words[4] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 3);
+	desc[2].cmd.pio_words[5] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 3);
+	desc[2].cmd.next = (uint32_t)&desc[3].cmd;
+	/* RUN */
+	desc[3].address = (dma_addr_t)&desc[3];
+	desc[3].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(1 << MXS_DMA_DESC_PIO_WORDS_OFFSET) | MXS_DMA_DESC_WAIT4END;
+	desc[3].cmd.pio_words[0] = LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_DATA_SELECT | LCDIF_CTRL_WORD_LENGTH_8BIT |
+		LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT | LCDIF_CTRL_RUN;
+	desc[3].cmd.next = (uint32_t)&desc[4].cmd;
+
+	/* Column Address Set - Start Column (lower byte) */
+	desc[4].address = (dma_addr_t)&desc[4];
+	desc[4].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(6 << MXS_DMA_DESC_PIO_WORDS_OFFSET);
+	desc[4].cmd.pio_words[0] = LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_DATA_SELECT | LCDIF_CTRL_WORD_LENGTH_8BIT |
+		LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT;
+	desc[4].cmd.pio_words[1] = (ctrl1 & (~LCDIF_CTRL1_BYTE_PACKING_FORMAT_MASK))
+		| (0x1 << LCDIF_CTRL1_BYTE_PACKING_FORMAT_OFFSET);
+	desc[4].cmd.pio_words[2] = ctrl2;
+	desc[4].cmd.pio_words[3] = (1 << LCDIF_TRANSFER_COUNT_V_COUNT_OFFSET) |
+		(1 << LCDIF_TRANSFER_COUNT_H_COUNT_OFFSET);
+	desc[4].cmd.pio_words[4] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 3);
+	desc[4].cmd.pio_words[5] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 3);
+	desc[4].cmd.next = (uint32_t)&desc[5].cmd;
+	/* RUN */
+	desc[5].address = (dma_addr_t)&desc[5];
+	desc[5].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(1 << MXS_DMA_DESC_PIO_WORDS_OFFSET) | MXS_DMA_DESC_WAIT4END;
+	desc[5].cmd.pio_words[0] = LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_DATA_SELECT | LCDIF_CTRL_WORD_LENGTH_8BIT |
+		LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT | LCDIF_CTRL_RUN;
+	desc[5].cmd.next = (uint32_t)&desc[6].cmd;
+
+	/* Column Address Set - End Column (upper byte) */
+	desc[6].address = (dma_addr_t)&desc[6];
+	desc[6].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(6 << MXS_DMA_DESC_PIO_WORDS_OFFSET);
+	desc[6].cmd.pio_words[0] = LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_DATA_SELECT | LCDIF_CTRL_WORD_LENGTH_8BIT |
+		LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT;
+	desc[6].cmd.pio_words[1] = (ctrl1 & (~LCDIF_CTRL1_BYTE_PACKING_FORMAT_MASK))
+		| (0x1 << LCDIF_CTRL1_BYTE_PACKING_FORMAT_OFFSET);
+	desc[6].cmd.pio_words[2] = ctrl2;
+	desc[6].cmd.pio_words[3] = (1 << LCDIF_TRANSFER_COUNT_V_COUNT_OFFSET) |
+		(1 << LCDIF_TRANSFER_COUNT_H_COUNT_OFFSET);
+	desc[6].cmd.pio_words[4] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 4);
+	desc[6].cmd.pio_words[5] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 4);
+	desc[6].cmd.next = (uint32_t)&desc[7].cmd;
+	/* RUN */
+	desc[7].address = (dma_addr_t)&desc[7];
+	desc[7].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(1 << MXS_DMA_DESC_PIO_WORDS_OFFSET) | MXS_DMA_DESC_WAIT4END;
+	desc[7].cmd.pio_words[0] = LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_DATA_SELECT | LCDIF_CTRL_WORD_LENGTH_8BIT |
+		LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT | LCDIF_CTRL_RUN;
+	desc[7].cmd.next = (uint32_t)&desc[8].cmd;
+
+	/* Column Address Set - End Column (lower byte) */
+	desc[8].address = (dma_addr_t)&desc[8];
+	desc[8].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(6 << MXS_DMA_DESC_PIO_WORDS_OFFSET);
+	desc[8].cmd.pio_words[0] = LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_DATA_SELECT | LCDIF_CTRL_WORD_LENGTH_8BIT |
+		LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT;
+	desc[8].cmd.pio_words[1] = (ctrl1 & (~LCDIF_CTRL1_BYTE_PACKING_FORMAT_MASK))
+		| (0x1 << LCDIF_CTRL1_BYTE_PACKING_FORMAT_OFFSET);
+	desc[8].cmd.pio_words[2] = ctrl2;
+	desc[8].cmd.pio_words[3] = (1 << LCDIF_TRANSFER_COUNT_V_COUNT_OFFSET) |
+		(1 << LCDIF_TRANSFER_COUNT_H_COUNT_OFFSET);
+	desc[8].cmd.pio_words[4] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 5);
+	desc[8].cmd.pio_words[5] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 5);
+	desc[8].cmd.next = (uint32_t)&desc[9].cmd;
+	/* RUN */
+	desc[9].address = (dma_addr_t)&desc[9];
+	desc[9].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(1 << MXS_DMA_DESC_PIO_WORDS_OFFSET) | MXS_DMA_DESC_WAIT4END;
+	desc[9].cmd.pio_words[0] =  LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_DATA_SELECT | LCDIF_CTRL_WORD_LENGTH_8BIT |
+		LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT | LCDIF_CTRL_RUN;
+	desc[9].cmd.next = (uint32_t)&desc[10].cmd;
+
+	/* Page Address Set (2b) */
+	desc[10].address = (dma_addr_t)&desc[10];
+	desc[10].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(6 << MXS_DMA_DESC_PIO_WORDS_OFFSET);
+	desc[10].cmd.pio_words[0] =  LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_WORD_LENGTH_8BIT | LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT;
+	desc[10].cmd.pio_words[1] = (ctrl1 & (~LCDIF_CTRL1_BYTE_PACKING_FORMAT_MASK))
+		| (0x1 << LCDIF_CTRL1_BYTE_PACKING_FORMAT_OFFSET);
+	desc[10].cmd.pio_words[2] = ctrl2;
+	desc[10].cmd.pio_words[3] = (1 << LCDIF_TRANSFER_COUNT_V_COUNT_OFFSET) |
+		(1 << LCDIF_TRANSFER_COUNT_H_COUNT_OFFSET);
+	desc[10].cmd.pio_words[4] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 1);
+	desc[10].cmd.pio_words[5] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 1);
+	desc[10].cmd.next = (uint32_t)&desc[11].cmd;
+	/* RUN */
+	desc[11].address = (dma_addr_t)&desc[11];
+	desc[11].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(1 << MXS_DMA_DESC_PIO_WORDS_OFFSET) | MXS_DMA_DESC_WAIT4END;
+	desc[11].cmd.pio_words[0] = LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_WORD_LENGTH_8BIT | LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT |
+		LCDIF_CTRL_RUN;
+	desc[11].cmd.next = (uint32_t)&desc[12].cmd;
+
+	/* Page Address Set - Start Page (upper byte) */
+	desc[12].address = (dma_addr_t)&desc[12];
+	desc[12].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(6 << MXS_DMA_DESC_PIO_WORDS_OFFSET);
+	desc[12].cmd.pio_words[0] = LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_DATA_SELECT | LCDIF_CTRL_WORD_LENGTH_8BIT |
+		LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT;
+	desc[12].cmd.pio_words[1] = (ctrl1 & (~LCDIF_CTRL1_BYTE_PACKING_FORMAT_MASK))
+		| (0x1 << LCDIF_CTRL1_BYTE_PACKING_FORMAT_OFFSET);
+	desc[12].cmd.pio_words[2] = ctrl2;
+	desc[12].cmd.pio_words[3] = (1 << LCDIF_TRANSFER_COUNT_V_COUNT_OFFSET) |
+		(1 << LCDIF_TRANSFER_COUNT_H_COUNT_OFFSET);
+	desc[12].cmd.pio_words[4] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 3);
+	desc[12].cmd.pio_words[5] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 3);
+	desc[12].cmd.next = (uint32_t)&desc[13].cmd;
+	/* RUN */
+	desc[13].address = (dma_addr_t)&desc[13];
+	desc[13].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(1 << MXS_DMA_DESC_PIO_WORDS_OFFSET) | MXS_DMA_DESC_WAIT4END;
+	desc[13].cmd.pio_words[0] = LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_DATA_SELECT | LCDIF_CTRL_WORD_LENGTH_8BIT |
+		LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT | LCDIF_CTRL_RUN;
+	desc[13].cmd.next = (uint32_t)&desc[14].cmd;
+
+	/* Page Address Set - Start Page (lower byte) */
+	desc[14].address = (dma_addr_t)&desc[14];
+	desc[14].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(6 << MXS_DMA_DESC_PIO_WORDS_OFFSET);
+	desc[14].cmd.pio_words[0] = LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_DATA_SELECT | LCDIF_CTRL_WORD_LENGTH_8BIT |
+		LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT;
+	desc[14].cmd.pio_words[1] = (ctrl1 & (~LCDIF_CTRL1_BYTE_PACKING_FORMAT_MASK))
+		| (0x1 << LCDIF_CTRL1_BYTE_PACKING_FORMAT_OFFSET);
+	desc[14].cmd.pio_words[2] = ctrl2;
+	desc[14].cmd.pio_words[3] = (1 << LCDIF_TRANSFER_COUNT_V_COUNT_OFFSET) |
+		(1 << LCDIF_TRANSFER_COUNT_H_COUNT_OFFSET);
+	desc[14].cmd.pio_words[4] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 3);
+	desc[14].cmd.pio_words[5] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 3);
+	desc[14].cmd.next = (uint32_t)&desc[15].cmd;
+	/* RUN */
+	desc[15].address = (dma_addr_t)&desc[15];
+	desc[15].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(1 << MXS_DMA_DESC_PIO_WORDS_OFFSET) | MXS_DMA_DESC_WAIT4END;
+	desc[15].cmd.pio_words[0] = LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_DATA_SELECT | LCDIF_CTRL_WORD_LENGTH_8BIT |
+		LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT | LCDIF_CTRL_RUN;
+	desc[15].cmd.next = (uint32_t)&desc[16].cmd;
+
+	/* Page Address Set - End Page (upper byte) */
+	desc[16].address = (dma_addr_t)&desc[16];
+	desc[16].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(6 << MXS_DMA_DESC_PIO_WORDS_OFFSET);
+	desc[16].cmd.pio_words[0] = LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_DATA_SELECT | LCDIF_CTRL_WORD_LENGTH_8BIT |
+		LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT;
+	desc[16].cmd.pio_words[1] = (ctrl1 & (~LCDIF_CTRL1_BYTE_PACKING_FORMAT_MASK))
+		| (0x1 << LCDIF_CTRL1_BYTE_PACKING_FORMAT_OFFSET);
+	desc[16].cmd.pio_words[2] = ctrl2;
+	desc[16].cmd.pio_words[3] = (1 << LCDIF_TRANSFER_COUNT_V_COUNT_OFFSET) |
+		(1 << LCDIF_TRANSFER_COUNT_H_COUNT_OFFSET);
+	desc[16].cmd.pio_words[4] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 6);
+	desc[16].cmd.pio_words[5] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 6);
+	desc[16].cmd.next = (uint32_t)&desc[17].cmd;
+	/* RUN */
+	desc[17].address = (dma_addr_t)&desc[17];
+	desc[17].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(1 << MXS_DMA_DESC_PIO_WORDS_OFFSET) | MXS_DMA_DESC_WAIT4END;
+	desc[17].cmd.pio_words[0] =  LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_DATA_SELECT | LCDIF_CTRL_WORD_LENGTH_8BIT |
+		LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT | LCDIF_CTRL_RUN;
+	desc[17].cmd.next = (uint32_t)&desc[18].cmd;
+
+	/* Page Address Set - End Page (lower byte) */
+	desc[18].address = (dma_addr_t)&desc[18];
+	desc[18].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(6 << MXS_DMA_DESC_PIO_WORDS_OFFSET);
+	desc[18].cmd.pio_words[0] = LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_DATA_SELECT | LCDIF_CTRL_WORD_LENGTH_8BIT |
+		LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT;
+	desc[18].cmd.pio_words[1] = (ctrl1 & (~LCDIF_CTRL1_BYTE_PACKING_FORMAT_MASK))
+		| (0x1 << LCDIF_CTRL1_BYTE_PACKING_FORMAT_OFFSET);
+	desc[18].cmd.pio_words[2] = ctrl2;
+	desc[18].cmd.pio_words[3] = (1 << LCDIF_TRANSFER_COUNT_V_COUNT_OFFSET) |
+		(1 << LCDIF_TRANSFER_COUNT_H_COUNT_OFFSET);
+	desc[18].cmd.pio_words[4] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 7);
+	desc[18].cmd.pio_words[5] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 7);
+	desc[18].cmd.next = (uint32_t)&desc[19].cmd;
+	/* RUN */
+	desc[19].address = (dma_addr_t)&desc[19];
+	desc[19].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(1 << MXS_DMA_DESC_PIO_WORDS_OFFSET) | MXS_DMA_DESC_WAIT4END;
+	desc[19].cmd.pio_words[0] =  LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_DATA_SELECT | LCDIF_CTRL_WORD_LENGTH_8BIT |
+		LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT | LCDIF_CTRL_RUN;
+	desc[19].cmd.next = (uint32_t)&desc[20].cmd;
+
+	/* Memory Write (2c) */
+	desc[20].address = (dma_addr_t)&desc[20];
+	desc[20].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(6 << MXS_DMA_DESC_PIO_WORDS_OFFSET);
+	desc[20].cmd.pio_words[0] =  LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_WORD_LENGTH_8BIT | LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT;
+	desc[20].cmd.pio_words[1] = (ctrl1 & (~LCDIF_CTRL1_BYTE_PACKING_FORMAT_MASK))
+		| (0x1 << LCDIF_CTRL1_BYTE_PACKING_FORMAT_OFFSET);
+	desc[20].cmd.pio_words[2] = ctrl2;
+	desc[20].cmd.pio_words[3] = (1 << LCDIF_TRANSFER_COUNT_V_COUNT_OFFSET) |
+		(1 << LCDIF_TRANSFER_COUNT_H_COUNT_OFFSET);
+	desc[20].cmd.pio_words[4] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 2);
+	desc[20].cmd.pio_words[5] = (u32)(lcd_data + ARCH_DMA_MINALIGN * 2);
+	desc[20].cmd.next = (uint32_t)&desc[21].cmd;
+	/* RUN */
+	desc[21].address = (dma_addr_t)&desc[21];
+	desc[21].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(1 << MXS_DMA_DESC_PIO_WORDS_OFFSET) | MXS_DMA_DESC_WAIT4END;
+	desc[21].cmd.pio_words[0] = LCDIF_CTRL_LCDIF_MASTER |
+		LCDIF_CTRL_WORD_LENGTH_8BIT | LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT |
+		LCDIF_CTRL_RUN;
+	desc[21].cmd.next = (uint32_t)&desc[22].cmd;
+
+	/* Restore registers */
+	desc[22].address = (dma_addr_t)&desc[22];
+	desc[22].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(6 << MXS_DMA_DESC_PIO_WORDS_OFFSET);
+	desc[22].cmd.pio_words[0] = ctrl & (~LCDIF_CTRL_RUN);
+	desc[22].cmd.pio_words[1] = ctrl1;
+	desc[22].cmd.pio_words[2] = ctrl2;
+	desc[22].cmd.pio_words[3] = xfer_count;
+	desc[22].cmd.pio_words[4] = fb;
+	desc[22].cmd.pio_words[5] = fb;
+	desc[22].cmd.next = (uint32_t)&desc[23].cmd;
+	/* RUN */
+	desc[23].address = (dma_addr_t)&desc[23];
+	desc[23].cmd.data = MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_CHAIN |
+		(1 << MXS_DMA_DESC_PIO_WORDS_OFFSET) | MXS_DMA_DESC_WAIT4END;
+	desc[23].cmd.pio_words[0] = ctrl | LCDIF_CTRL_RUN;
+	desc[23].cmd.next = (uint32_t)&desc[0].cmd;
+
+	/* Execute the DMA chain. */
+	mxs_dma_circ_start(MXS_DMA_CHANNEL_AHB_APBH_LCDIF, desc);
+#else
 	/*
 	 * If the LCD runs in system mode, the LCD refresh has to be triggered
 	 * manually by setting the RUN bit in HW_LCDIF_CTRL register. To avoid
@@ -226,6 +538,7 @@ static int mxs_probe_common(struct udevice *dev, struct display_timing *timings,
 
 	/* Execute the DMA chain. */
 	mxs_dma_circ_start(MXS_DMA_CHANNEL_AHB_APBH_LCDIF, &desc);
+#endif
 #endif
 
 	return 0;
