@@ -27,7 +27,8 @@ config TARGET_MX7ULP_EVK
 	select SYS_ARCH_TIMER
 
 config TARGET_PWH1
-        bool "Support PW-H1 board"
+	bool "Support PW-H1 board"
+	select MX7ULP
 	select SYS_ARCH_TIMER
 
 endchoice
