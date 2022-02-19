@@ -57,6 +57,9 @@
 	"initrd_high=0xffffffff\0" \
 	"fdt_file=imx7ulp-pwh1.dtb\0" \
 	"fdt_addr=0x63000000\0" \
+	"stdin=serial\0" \
+	"stdout=serial,vidconsole\0" \
+	"stderr=serial,vidconsole\0" \
 	"boot_fdt=try\0" \
 	"earlycon=lpuart32,0x402D0010\0" \
 	"ip_dyn=yes\0" \
