@@ -41,6 +41,8 @@
 
 #define CONFIG_SYS_MAXARGS		256
 
+#define CONFIG_VIDEO_FONT_6X11
+
 /* Physical Memory Map */
 
 #define PHYS_SDRAM			0x60000000
@@ -52,11 +54,18 @@
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"script=boot.scr\0" \
 	"image=zImage\0" \
+	"splashsource=mmc_fs\0" \
+	"splashfile=splash.bmp\0" \
+	"splashimage=0x64000000\0" \
+	"splashpos=192,m\0" \
 	"console=ttyLP0\0" \
 	"fdt_high=0xffffffff\0" \
 	"initrd_high=0xffffffff\0" \
 	"fdt_file=imx7ulp-pwh1.dtb\0" \
 	"fdt_addr=0x63000000\0" \
+	"stdin=serial\0" \
+	"stdout=serial,vidconsole\0" \
+	"stderr=serial,vidconsole\0" \
 	"boot_fdt=try\0" \
 	"earlycon=lpuart32,0x402D0010\0" \
 	"ip_dyn=yes\0" \

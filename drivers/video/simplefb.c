@@ -28,7 +28,7 @@ static int simple_video_probe(struct udevice *dev)
 		return -EINVAL;
 	}
 
-	debug("%s: base=%llx, size=%llu\n", __func__, base, size);
+	debug("%s: base=%lx, size=%lu\n", __func__, base, size);
 
 	/*
 	 * TODO is there some way to reserve the framebuffer
@@ -43,7 +43,11 @@ static int simple_video_probe(struct udevice *dev)
 
 	uc_priv->xsize = fdtdec_get_uint(blob, node, "width", 0);
 	uc_priv->ysize = fdtdec_get_uint(blob, node, "height", 0);
-	uc_priv->rot = 0;
+	uc_priv->rot = fdtdec_get_uint(blob, node, "rot", 0) / 90;
+	if (uc_priv->rot < 0 || uc_priv->rot > 3) {
+		printf("%s: invalid rot\n", __func__);
+		return -EINVAL;
+	}
 
 	format = fdt_getprop(blob, node, "format", NULL);
 	debug("%s: %dx%d@%s\n", __func__, uc_priv->xsize, uc_priv->ysize, format);

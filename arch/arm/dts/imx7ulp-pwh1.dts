@@ -40,6 +40,16 @@
 		status = "okay";
 	};
 
+	simplefb: simplefb {
+		status = "okay";
+		reg = <0x62000000 0xc6c00>;
+		compatible = "simple-framebuffer";
+		width = <480>;
+		height = <854>;
+		format = "r5g6b5";
+		rot = <90>;
+	};
+
 	mipi_dsi_reset: mipi-dsi-reset {
 		compatible = "gpio-reset";
 		reset-gpios = <&gpio0 19 GPIO_ACTIVE_LOW>;
