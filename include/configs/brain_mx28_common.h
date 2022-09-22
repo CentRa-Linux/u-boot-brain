@@ -57,43 +57,99 @@
 	"stdin=serial\0" \
 	"stdout=serial,vga\0" \
 	"stderr=serial,vga\0" \
-	"videomode=video=ctfb:x:" CONFIG_LCD_X ",y:" CONFIG_LCD_Y ",depth:16,pclk:30857,le:0,ri:0,up:0,lo:0,hs:0,vs:0,sync:0,vmode:0\0" \
 	"bootdelay=0\0" \
+	"videomode=video=ctfb:x:" CONFIG_LCD_X ",y:" CONFIG_LCD_Y ",depth:16,pclk:30857,le:0,ri:0,up:0,lo:0,hs:0,vs:0,sync:0,vmode:0\0" \
 	"image=zImage\0" \
 	"console_mainline=ttyAMA0\0" \
+	"bootargs_custom=fbcon=font:ProFont6x11\0" \
+	"bootorder=emmc sd\0" \
 	"fdt_file=" CONFIG_DEFAULT_FDT_FILE "\0" \
 	"fdt_addr=0x41000000\0" \
-	"boot_fdt=try\0" \
-	"mmcdev=1\0" \
-	"mmcpart=1\0" \
-	"mmcroot=/dev/mmcblk1p2 rw rootwait\0" \
-	"mmcargs=setenv bootargs console=${console_mainline},${baudrate} console=tty1 " \
-		"root=${mmcroot} fbcon=font:ProFont6x11\0" \
-	"loadimage=fatload mmc ${mmcdev}:${mmcpart} ${loadaddr} ${image}\0" \
-	"loadfdt=fatload mmc ${mmcdev}:${mmcpart} ${fdt_addr} ${fdt_file}\0" \
-	"mmcboot=echo Booting from mmc ...; " \
-		"run mmcargs; " \
-		"if test ${boot_fdt} = yes || test ${boot_fdt} = try; then " \
-			"if run loadfdt; then " \
-				"bootz ${loadaddr} - ${fdt_addr}; " \
-			"else " \
-				"if test ${boot_fdt} = try; then " \
-					"bootz; " \
-				"else " \
-					"echo WARN: Cannot load the DT; " \
-				"fi; " \
-			"fi; " \
-		"else " \
-			"bootz; " \
-		"fi;\0" \
-
-#define CONFIG_BOOTCOMMAND \
-	"mmc dev ${mmcdev}; if mmc rescan; then " \
-		"if run loadimage; then " \
-			"run mmcboot; " \
-		"else run netboot; " \
+	"verbose=no\0" \
+	"printfail=echo failed to ${fail}\0" \
+	"quiet=" \
+		"if test $verbose = no; then " \
+			"setenv stdout_orig ${stdout}; " \
+			"setenv stdout nulldev; " \
+		"fi\0" \
+	"unquiet=" \
+		"setenv returncode $?; " \
+		"if test -n $stdout_orig; then " \
+			"setenv stdout ${stdout_orig}; " \
 		"fi; " \
-	"else run netboot; fi"
+		"exit $returncode\0" \
+	"sddev=1\0" \
+	"sdpart=1\0" \
+	"sdroot=/dev/mmcblk1p2 rw rootwait\0" \
+	"selectsd=" \
+		"setenv dev ${sddev}; " \
+		"setenv part ${sdpart}; " \
+		"setenv root ${sdroot}; " \
+		"setenv devname SD; " \
+		"run quiet; " \
+		"mmc dev ${dev}; " \
+		"run unquiet\0" \
+	"emmcdev=0\0" \
+	"emmcpart=1\0" \
+	"emmcroot=/dev/mmcblk0p3 rw rootwait\0" \
+	"selectemmc=" \
+		"setenv dev ${emmcdev}; " \
+		"setenv part ${emmcpart}; " \
+		"setenv root ${emmcroot}; " \
+		"setenv devname eMMC; " \
+		"run quiet; " \
+		"mmc dev ${dev}; " \
+		"run unquiet\0" \
+	"loadimage=" \
+		"run quiet; " \
+		"fatload mmc ${dev}:${part} ${loadaddr} ${image}; " \
+		"run unquiet\0" \
+	"loadfdt=" \
+		"run quiet; " \
+		"fatload mmc ${dev}:${part} ${fdt_addr} ${fdt_file}; " \
+		"run unquiet\0" \
+	"loadenv=" \
+		"run quiet; " \
+		"fatload mmc ${dev}:${part} ${loadaddr} uEnv.txt; " \
+		"run unquiet\0" \
+	"importenv=" \
+		"run quiet; " \
+		"env import -t ${loadaddr} ${filesize}; " \
+		"run unquiet\0" \
+	"loadandimportenv=" \
+		"if test -e mmc ${dev}:${part} uEnv.txt; then " \
+			"echo -n \"Loading environment from ${devname} ... \"; " \
+			"if setenv fail load && run loadenv && setenv fail parse && run importenv; then " \
+				"echo OK; " \
+			"else " \
+				"run printfail; " \
+			"fi; " \
+		"fi\0" \
+	"setargs=setenv bootargs console=${console_mainline},${baudrate} console=tty1 " \
+		"root=${root} ${bootargs_custom}\0" \
+	"mmcboot=" \
+		"echo -n \"Loading kernel and device tree from ${devname} ... \"; " \
+		"if setenv fail load image && run loadimage && setenv fail load DT && run loadfdt; then " \
+			"echo OK; " \
+			"echo \"Booting from ${devname} ... \"; " \
+			"setenv fail bootz; " \
+			"run setargs; " \
+			"bootz ${loadaddr} - ${fdt_addr}; " \
+		"fi; " \
+		"run printfail\0" \
+	"preboot=" \
+		"for choice in emmc sd; do " /* Env in SD must have higher priority */ \
+			"if run select$choice; then " \
+				"run loadandimportenv; " \
+			"fi; " \
+		"done\0" \
+	"bootcmd=" \
+		"for choice in $bootorder; do " \
+			"if run select$choice; then " \
+				"run mmcboot; " \
+			"fi; " \
+		"done; " \
+		"echo Failed to boot (X_X)"
 
 /* The rest of the configuration is shared */
 #include <configs/mxs.h>
