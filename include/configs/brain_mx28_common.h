@@ -108,6 +108,10 @@
 		"run quiet; " \
 		"fatload mmc ${dev}:${part} ${fdt_addr} ${fdt_file}; " \
 		"run unquiet\0" \
+	"checkenvexists=" \
+		"run quiet; " \
+		"test -e mmc ${dev}:${part} uEnv.txt; " \
+		"run unquiet\0" \
 	"loadenv=" \
 		"run quiet; " \
 		"fatload mmc ${dev}:${part} ${loadaddr} uEnv.txt; " \
@@ -117,7 +121,7 @@
 		"env import -t ${loadaddr} ${filesize}; " \
 		"run unquiet\0" \
 	"loadandimportenv=" \
-		"if test -e mmc ${dev}:${part} uEnv.txt; then " \
+		"if run checkenvexists; then " \
 			"echo -n \"Loading environment from ${devname} ... \"; " \
 			"if setenv fail load && run loadenv && setenv fail parse && run importenv; then " \
 				"echo OK; " \
