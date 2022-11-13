@@ -78,15 +78,7 @@ config TARGET_PWSH7
 	select BOARD_EARLY_INIT_F
 
 config TARGET_PWA7200
-	bool "Support PW-A7200"
-	select BOARD_EARLY_INIT_F
-
-config TARGET_PWG4200
-	bool "Support PW-G4200"
-	select BOARD_EARLY_INIT_F
-
-config TARGET_PWG5300
-	bool "Support PW-G5300"
+	bool "Support PW-A7200 series"
 	select BOARD_EARLY_INIT_F
 
 endchoice
@@ -105,7 +97,5 @@ source "board/sharp/pwsh5/Kconfig"
 source "board/sharp/pwsh6/Kconfig"
 source "board/sharp/pwsh7/Kconfig"
 source "board/sharp/pwa7200/Kconfig"
-source "board/sharp/pwg4200/Kconfig"
-source "board/sharp/pwg5300/Kconfig"
 
 endif
