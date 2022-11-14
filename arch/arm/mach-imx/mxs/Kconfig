@@ -79,6 +79,10 @@ config TARGET_PWSH7
 
 config TARGET_PWA7200
 	bool "Support PW-A7200 series"
+	help
+	  Compatible with:
+	   PW-G4200, PW-G5200, PW-G5300, PW-A7200, PW-A7300, PW-A7400,
+	   PW-A9100, PW-A9200, PW-A9300
 	select BOARD_EARLY_INIT_F
 
 endchoice
