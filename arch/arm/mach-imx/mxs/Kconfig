@@ -81,8 +81,12 @@ config TARGET_PWA7200
 	bool "Support PW-A7200 series"
 	help
 	  Compatible with:
-	   PW-G4200, PW-G5200, PW-G5300, PW-A7200, PW-A7300, PW-A7400,
+	   PW-G4200, PW-G5200, PW-G5300, PW-A7200, PW-A7300,
 	   PW-A9100, PW-A9200, PW-A9300
+	select BOARD_EARLY_INIT_F
+
+config TARGET_PWA7400
+	bool "Support PW-A7400"
 	select BOARD_EARLY_INIT_F
 
 endchoice
@@ -101,5 +105,6 @@ source "board/sharp/pwsh5/Kconfig"
 source "board/sharp/pwsh6/Kconfig"
 source "board/sharp/pwsh7/Kconfig"
 source "board/sharp/pwa7200/Kconfig"
+source "board/sharp/pwa7400/Kconfig"
 
 endif
