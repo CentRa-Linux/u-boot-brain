@@ -1,0 +1,17 @@
+if TARGET_PWA7400
+
+config SYS_BOARD
+	default "pwa7400"
+
+config SYS_VENDOR
+	default "sharp"
+
+config SYS_SOC
+	default "mxs"
+
+config SYS_CONFIG_NAME
+	default "pwa7400"
+
+endif
+
+source "board/sharp/common/Kconfig"

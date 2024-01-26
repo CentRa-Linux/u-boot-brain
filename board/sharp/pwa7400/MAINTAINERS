@@ -1,0 +1,6 @@
+PW-A7400 BOARD
+M:	Suguru Saito <sg.sgch07@gmail.com>
+S:	Maintained
+F:	board/sharp/pwa7400/
+F:	include/configs/pwa7400.h
+F:	configs/pwa7400_defconfig
