@@ -4,3 +4,4 @@ obj-$(CONFIG_VIDEO_MXS)	+= dma.o
 else
 obj- = __dummy__.o
 endif
+obj-y	:= cpu_clkdiv.o
