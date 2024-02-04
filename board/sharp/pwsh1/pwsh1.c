@@ -26,6 +26,7 @@
 #include <errno.h>
 
 #include "../common/lcd.h"
+#include "../common/cpu_clkdiv.h"
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -43,6 +44,8 @@ int board_early_init_f(void)
 	mxs_set_sspclk(MXC_SSPCLK0, 96000, 0);
 	/* SSP1 clock at 96MHz */
 	mxs_set_sspclk(MXC_SSPCLK1, 96000, 0);
+	/* set cpu clock div 1(480MHz)*/
+	mxs_set_divcpu(1);
 
 #ifdef CONFIG_CMD_USB
 	mxs_iomux_setup_pad(MX28_PAD_SSP2_SS1__USB1_OVERCURRENT);
